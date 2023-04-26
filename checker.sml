@@ -1,9 +1,7 @@
-use "set";
+use "set.sml";
 
-datatype prop = Atom of string 
-              | Neg of prop 
-              | Disj of (prop * prop) 
-              | Conj of (prop * prop)
+infix !>
+fun (x !> f) = f x
 
 signature PROP = sig
   type t
@@ -12,43 +10,53 @@ signature PROP = sig
   val is_valid: t list * t -> bool
 end
 
-structure Prop : PROP = struct
+
+structure Prop = struct
   exception FormError
-  type t = prop
+  exception Contradiction
+
+  datatype t = Atom of string 
+                | Neg of t 
+                | Disj of (t * t) 
+                | Conj of (t * t)
+
+  fun to_string (Atom s) = s
+    | to_string (Neg p) = "~" ^ (to_string p)
+    | to_string (Disj (Neg p, q)) = "(" ^ (to_string p) ^ " -> " ^ (to_string q) ^ ")"  
+    | to_string (Disj (p, q)) = "(" ^ (to_string p) ^ " V " ^ (to_string q) ^ ")"
+    | to_string (Conj (p, q)) = "(" ^ (to_string p) ^ " & " ^ (to_string q) ^ ")"
+
+  structure PropOrder : MEM = struct
+    type t = t
+    fun compare (p, q) = String.compare (to_string p, to_string q)
+  end
+
+  structure PropSet = Set(PropOrder)
 
   fun ifthen (p, q) = Disj (Neg p, q)
-
   
-  fun to_string (Atom s) = s
-    | to_string (Neg p) = "~( " ^ (to_string p) ^ " )"
-    | to_string (Disj (Neg p, q)) = "( " ^ (to_string p) ^ " -> " ^ (to_string q) ^ ")"  
-    | to_string (Disj (p, q)) = "( " ^ (to_string p) ^ " V " ^ (to_string q) ^ " )"
-    | to_string (Conj (p, q)) = "( " ^ (to_string p) ^ " & " ^ (to_string q) ^ " )"
-
-  fun nnf (Neg (Neg p)) = p
-    | nnf (Neg (Conj (p, q))) = Disj (Neg (nnf p), Neg (nnf q))
-    | nnf (Neg (Disj (p, q))) = Conj (Neg (nnf p), Neg (nnf q))
+  (* Put a formula into negation normal form *)
+  fun nnf (Neg (Neg p)) = nnf p
+    | nnf (Neg (Conj (p, q))) = Disj (nnf (Neg p), nnf (Neg q))
+    | nnf (Neg (Disj (p, q))) = Conj (nnf (Neg p), nnf (Neg q))
     | nnf (Disj (p, q)) = Disj (nnf p, nnf q)
     | nnf (Conj (p, q)) = Conj (nnf p, nnf q)
-    | nnf (Neg p) = Neg p
+    | nnf (Neg p) = Neg (nnf p)
     | nnf (Atom s) = Atom s
 
-  fun nnf_to_cnf (Disj (p, Conj (q, r))) = Conj (Disj (p, q), Disj (p, r))
-    | nnf_to_cnf (Disj (Conj (p, q), r)) = Conj (Disj (p, r), Disj (q, r))
+  (* Put a formula in negation normal form into cnf *)
+  fun nnf_to_cnf (Disj (p, Conj (q, r))) = 
+        Conj (nnf_to_cnf (Disj (p, q)), nnf_to_cnf (Disj (p, r)))
+    | nnf_to_cnf (Disj (Conj (p, q), r)) = 
+        Conj (nnf_to_cnf (Disj (p, r)), nnf_to_cnf (Disj (q, r)))
     | nnf_to_cnf (Conj (p, q)) = Conj (nnf_to_cnf p, nnf_to_cnf q)
     | nnf_to_cnf (Disj (p, q)) = Disj (nnf_to_cnf p, nnf_to_cnf q)
     | nnf_to_cnf (Neg p) = Neg (nnf_to_cnf p)
     | nnf_to_cnf (Atom s) = Atom s
 
-  fun is_tautology (Conj (p, q)) =
-        let 
-          fun eval_literals (Disj p, q) = 
-          fun aux (c1 as Conj (p1, p2), c2 as Conj (q1, q2)) = (is_tautology c1) andalso (is_tautology c2)
-            | aux (literals, c2 as Conj (q1, q2)) = 
-            | aux (c1 as Conj (p1, p2), literals) = 
-                  
-    | is_tautology _ = raise FormError
-
+  (* Checker whether a formula in cnf is a tautology *)
+  fun check_cnf p = false
+(* Check whether an arbitary formula is a tautology by converting to cnf *) fun is_tautology p = p !> nnf !> nnf_to_cnf !> check_cnf (* Check whether an argument with arguments args and conclusion p is valid *)
   fun is_valid (args, p) =
     (*By the deduction theorem for propositional logic, An argument 
      * A1,..,An THEREFORE B is valid iff the proposition A1 -> ... -> An -> B
