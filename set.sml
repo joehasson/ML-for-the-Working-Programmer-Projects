@@ -1,6 +1,7 @@
 (* Define a polymorphic type of sets *
 * In chapter 7 of ML for the working programmer, Paulson defines
-* a functor creating dictionary types with arbitrarily ordered keys.*)
+* a functor creating dictionary types with arbitrarily ordered keys.
+ * The following is a similar implementation of tree sets.*)
 
 infix |>
 fun (x |> f) = f x
