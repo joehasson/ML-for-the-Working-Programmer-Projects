@@ -83,10 +83,10 @@ structure Prop = struct
      * this form which we can then check for validity. Not quite, because we
      * don't get the argument order right, but this is irrelevant *)
     let
-      fun arg_to_prop ([], q) = q
-        | arg_to_prop (p::args, q) =  arg_to_prop(args, ifthen(p,q))
+      val as_prop = List.foldr (fn (prem, c) => ifthen (prem, c)) p args
     in 
-      is_tautology (arg_to_prop(args, p)) 
+      is_tautology as_prop 
     end
+
 end
 
