@@ -44,19 +44,38 @@ structure Prop = struct
     | nnf (Neg p) = Neg (nnf p)
     | nnf (Atom s) = Atom s
 
-  (* Put a formula in negation normal form into cnf *)
-  fun nnf_to_cnf (Disj (p, Conj (q, r))) = 
-        Conj (nnf_to_cnf (Disj (p, q)), nnf_to_cnf (Disj (p, r)))
-    | nnf_to_cnf (Disj (Conj (p, q), r)) = 
-        Conj (nnf_to_cnf (Disj (p, r)), nnf_to_cnf (Disj (q, r)))
-    | nnf_to_cnf (Conj (p, q)) = Conj (nnf_to_cnf p, nnf_to_cnf q)
-    | nnf_to_cnf (Disj (p, q)) = Disj (nnf_to_cnf p, nnf_to_cnf q)
-    | nnf_to_cnf (Neg p) = Neg (nnf_to_cnf p)
-    | nnf_to_cnf (Atom s) = Atom s
+  (* Apply the two rewrite rules we use to put an expression p V q into CNF,
+   * given p and q in CNF. *)
+  fun distrib (p, Conj(q,r)) = Conj(distrib (p,q), distrib (p,r))
+    | distrib (Conj(p,q), r) = Conj(distrib (p,r), distrib (q,r))
+    | distrib (p, q) = Disj (p, q)
 
+  (* Put a formula in negation normal form into cnf *)
+  fun nnf_to_cnf (Disj(p, q)) = distrib(nnf_to_cnf p, nnf_to_cnf q) (* Apply rewrite rules given cnf formulae *)
+    | nnf_to_cnf (Conj(p, q)) = Conj (nnf_to_cnf p, nnf_to_cnf q)
+    | nnf_to_cnf p = p  (* Literals are in cnf *)
+ 
   (* Checker whether a formula in cnf is a tautology *)
-  fun check_cnf p = false
-(* Check whether an arbitary formula is a tautology by converting to cnf *) fun is_tautology p = p !> nnf !> nnf_to_cnf !> check_cnf (* Check whether an argument with arguments args and conclusion p is valid *)
+  fun check_cnf (Conj (p, q)) = (check_cnf p) andalso (check_cnf q)
+    | check_cnf p = 
+    let
+      fun positives (Atom s) = PropSet.insert(Atom s, PropSet.empty)
+        | positives (Neg (Atom s)) = PropSet.empty
+        | positives (Disj (p, q)) = PropSet.union (positives p, positives q)
+        | positives _ = raise FormError
+      fun negatives (Atom s) = PropSet.empty
+        | negatives (Neg (Atom s)) = PropSet.insert(Atom s, PropSet.empty)
+        | negatives (Disj (p, q)) = PropSet.union (negatives p, negatives q)
+        | negatives _ = raise FormError
+    in
+      PropSet.size (PropSet.inter (positives p, negatives p)) > 0
+    end
+
+(* Check whether an arbitary formula is a tautology by converting to cnf *) 
+
+  fun is_tautology p = p !> nnf !> nnf_to_cnf !> check_cnf 
+
+  (* Check whether an argument with arguments args and conclusion p is valid *)
   fun is_valid (args, p) =
     (*By the deduction theorem for propositional logic, An argument 
      * A1,..,An THEREFORE B is valid iff the proposition A1 -> ... -> An -> B
