@@ -88,5 +88,39 @@ structure Prop = struct
       is_tautology as_prop 
     end
 
+  (* Exercise: Implement an algorithm for testing whether a proposition is
+   * inconsistent exploiting disjunctive normal form
+   * Idea: A proposition in disjunctive normal form is inconsistent iff every
+   * disjunct is inconsistent. Since each disjunct is a conjunction or else
+   * a literal it follows that we can check whether a disjunct is inconsistent
+   * by checking whether each disjunct contains both a literal and its negation.
+   *)
+
+  (* Apply the two rewrite rules we use to put an expression p & q into DNF,
+   * given p and q in DNF.*)
+  fun distrib_c (p, Disj(q,r)) = Disj (distrib_c (p,q), distrib_c (p,r))
+    | distrib_c (Disj(p,q), r) = Disj (distrib_c (p,r), distrib_c (q,r))
+    | distrib_c (p, q) = Conj (p, q)
+
+  fun nnf_to_dnf (Conj (p,q)) = distrib_c (nnf_to_dnf p, nnf_to_dnf q)
+    | nnf_to_dnf (Disj (p,q)) = Disj (nnf_to_dnf p, nnf_to_dnf q)
+    | nnf_to_dnf p = p (* A literal *)
+
+  (* Return true if dnf formula is inconsistent *)
+  fun check_dnf (Disj (p, q)) = (check_dnf p) andalso (check_dnf q)
+    | check_dnf p = 
+        let
+          fun positives (Conj (r, s)) = PropSet.union (positives r, positives s)
+            | positives (Neg (Atom s)) = PropSet.empty
+            | positives (Atom s) = PropSet.insert(Atom s, PropSet.empty)
+          fun negatives (Conj (r, s)) = PropSet.union (negatives r, negatives s)
+            | negatives (Neg (Atom s)) = PropSet.insert(Atom s, PropSet.empty)
+            | negatives (Atom s) = PropSet.empty
+        in 
+          PropSet.size (PropSet.inter(positives p, negatives p)) > 0
+        end
+
+  fun is_contradiction p = p !> nnf !> nnf_to_dnf !>  check_dnf
+
 end
 
